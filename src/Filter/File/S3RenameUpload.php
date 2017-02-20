@@ -1,10 +1,13 @@
 <?php
-
 namespace AwsModule\Filter\File;
 
 use Aws\S3\S3Client;
 use AwsModule\Filter\Exception\MissingBucketException;
+use Zend\Filter\Exception\RuntimeException as FilterRuntimeException;
 use Zend\Filter\File\RenameUpload;
+use Zend\Stdlib\ErrorHandler;
+use Zend\Stdlib\RequestInterface;
+use Zend\Filter\File\Rename;
 
 /**
  * File filter that allow to directly upload to Amazon S3, and optionally rename the file
@@ -27,6 +30,60 @@ class S3RenameUpload extends RenameUpload
         'overwrite'            => false,
         'randomize'            => false,
     ];
+    
+    /**
+     * @var RequestInterface
+     */
+    protected $request;
+    
+    /**
+     * @param RequestInterface $request
+     */
+    public function setRequest(RequestInterface $request)
+    {
+    	$this->request = $request;
+    }
+    
+  
+    /**
+     * Override moveUploadedFile
+     *
+     * If the request is not HTTP, or not a PUT or PATCH request, delegates to
+     * the parent functionality.
+     *
+     * Otherwise, does a `rename()` operation, and returns the status of the
+     * operation.
+     *
+     * @param string $sourceFile
+     * @param string $targetFile
+     * @return bool
+     * @throws FilterRuntimeException in the event of a warning
+     */
+    protected function moveUploadedFile($sourceFile, $targetFile)
+    { 	
+    	if (null === $this->request
+    			|| ! method_exists($this->request, 'isPut')
+    			|| (! $this->request->isPut() && ! $this->request->isPatch())
+    			) {
+    				return parent::moveUploadedFile($sourceFile, $targetFile);
+    			}
+    			ErrorHandler::start();
+    			
+    			//$result = rename($sourceFile, $targetFile);
+    			$current = file_get_contents($sourceFile);
+    			$result = file_put_contents($targetFile, $current);
+    			     
+    			$warningException = ErrorHandler::stop();
+    
+    			if (false === $result || null !== $warningException) {
+    				throw new FilterRuntimeException(
+    						sprintf('File "%s" could not be renamed. An error occurred while processing the file.', $sourceFile),
+    						0,
+    						$warningException
+    						);
+    			}
+    			return $result;
+    }
 
     /**
      * @param S3Client $client
