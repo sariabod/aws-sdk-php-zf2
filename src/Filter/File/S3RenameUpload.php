@@ -32,14 +32,14 @@ class S3RenameUpload extends RenameUpload
     ];
     
     /**
-     * @var RequestInterface
+     * @var Request
      */
     protected $request;
     
     /**
-     * @param RequestInterface $request
+     * @param $request
      */
-    public function setRequest(RequestInterface $request)
+    public function setRequest($request)
     {
     	$this->request = $request;
     }
@@ -61,28 +61,27 @@ class S3RenameUpload extends RenameUpload
      */
     protected function moveUploadedFile($sourceFile, $targetFile)
     { 	
-    	if (null === $this->request
-    			|| ! method_exists($this->request, 'isPut')
-    			|| (! $this->request->isPut() && ! $this->request->isPatch())
-    			) {
-    				return parent::moveUploadedFile($sourceFile, $targetFile);
-    			}
-    			ErrorHandler::start();
+    	if ($this->request=='POST')
+    	{
+    		return parent::moveUploadedFile($sourceFile, $targetFile);
+    	}
+	elseif ($this->request=='PUT' || $this->request=='PATCH')
+	{
+    		ErrorHandler::start();
     			
-    			//$result = rename($sourceFile, $targetFile);
-    			$current = file_get_contents($sourceFile);
-    			$result = file_put_contents($targetFile, $current);
+    		$current = file_get_contents($sourceFile);
+    		$result = file_put_contents($targetFile, $current);
     			     
-    			$warningException = ErrorHandler::stop();
+    		$warningException = ErrorHandler::stop();
     
-    			if (false === $result || null !== $warningException) {
-    				throw new FilterRuntimeException(
-    						sprintf('File "%s" could not be renamed. An error occurred while processing the file.', $sourceFile),
-    						0,
-    						$warningException
-    						);
-    			}
-    			return $result;
+    		if (false === $result || null !== $warningException) 
+		{
+    			throw new FilterRuntimeException(
+    			sprintf('File "%s" could not be renamed. An error occurred while processing the file.', $sourceFile),0,$warningException);
+    		}
+
+    		return $result;
+	}
     }
 
     /**
